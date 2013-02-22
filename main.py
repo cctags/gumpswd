@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import base64
 import datetime
 import os
 import sys
@@ -23,13 +24,13 @@ def print_usage():
 """Usage: %s <subcommand> [option(s)] [args]
 
 Available subcommands:
-    add             "dict(caption='xx', ...)"
-    copy            <uuid>
-    init
-    list            [<uuid>]
-    remove          <uuid>
-    set             <uuid>  "dict(caption='xx', ...)"
-    setpassword     <uuid>
+   add          "dict(caption='xx', ...)"
+   copy         <id>
+   init
+   list         [<id>]
+   remove       <id>
+   set          <id> "dict(caption='xx', ...)"
+   setpassword  <id>
 """ % (program_name)
 
 def print_error(str):
@@ -96,67 +97,67 @@ def init():
         sys.exit(1)
     db.close()
 
-def set_content(uuid, str):
+def set_content(id, str):
     db = db_open()
-    if uuid:
-        d = db[uuid]
+    if id:
+        d = db[id]
     else:
-        uuid = generate_id()
-        db[uuid] = {}
-        d = db[uuid]
+        id = generate_id()
+        db[id] = {}
+        d = db[id]
     t = eval(str)
     for k, v in t.items():
         d[k] = v
-    db[uuid] = d
+    db[id] = d
     db.close()
 
-def set_password(uuid):
+def set_password(id):
     db = db_open()
-    if not db.has_key(uuid):
+    if not db.has_key(id):
         print_error("Entry not found!")
     else:
         ret, key = check_main_password()
         if ret:
             print "OK, now please input the password for that entry:"
             pwd = get_user_input_password()
-            d = db[uuid]
-            d["password"] = encrypt_string(pwd, key)
-            db[uuid] = d
+            d = db[id]
+            d["password"] = base64.encodestring(encrypt_string(pwd, key))
+            db[id] = d
         else:
             print_error("Wrong main password!")
     db.close()
 
-def copy(uuid):
+def copy(id):
     db = db_open()
-    if not db.has_key(uuid):
+    if not db.has_key(id):
         print_error("Entry not found!")
     else:
         ret, key = check_main_password()
         if ret:
-            save_text_to_clipboard(encrypt_string(db[uuid]["password"], key))
+            save_text_to_clipboard((encrypt_string(base64.decodestring(db[id]["password"]), key)))
         else:
             print_error("Wrong main password!")
     db.close()
 
-def remove(uuid):
+def remove(id):
     db = db_open()
-    if not db.has_key(uuid):
+    if not db.has_key(id):
         print_error("Entry not found!")
     else:
         ret, key = check_main_password()
         if ret:
-            del db[uuid]
+            del db[id]
         else:
             print_error("Wrong main password!")
     db.close()
 
-def list(uuid=None):
+def list(id=None):
     db = db_open()
-    if uuid:
-        if not db.has_key(uuid):
+    if id:
+        if not db.has_key(id):
             print_error("Entry not found!")
         else:
-            dump_tree(db[uuid])
+            dump_tree(db[id])
     else:
         dump_tree(db)
     db.close()

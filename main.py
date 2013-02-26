@@ -8,6 +8,8 @@ import sys
 import hashlib
 import binhex
 import getpass
+import random
+import string
 import uuid
 
 import xtea
@@ -27,6 +29,7 @@ def print_usage():
 Available subcommands:
    add          "dict(caption='xx', ...)"
    copy         <id>
+   genpassword  [<len>]
    init
    list         [<id> | <caption>]
    remove       <id>
@@ -55,6 +58,11 @@ def get_user_input_password():
             return pwd1
         else:
             print "Passwords don't match - try again:"
+
+def generate_password(range=None, size=16):
+    if not range:
+        range = string.lowercase + string.uppercase + string.digits
+    return string.join(random.sample(range, size)).replace(" ", "")
 
 def dump_tree(t, level=0, indent='    |'):
     level += 1
@@ -205,6 +213,11 @@ def main():
                 list(sys.argv[2])
             else:
                 list()
+        elif sys.argv[1] == "genpassword":
+            try:
+                print generate_password(size=int(sys.argv[2]))
+            except:
+                print generate_password()
     else:
         print_flag = True
 

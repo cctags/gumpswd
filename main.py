@@ -168,6 +168,7 @@ def list(arg=None):
                     print i
                     break
     else:
+        print program_name
         root = db
 
     if root:

@@ -6,6 +6,7 @@ import datetime
 import os
 import sys
 import hashlib
+import binhex
 import getpass
 import uuid
 
@@ -27,7 +28,7 @@ Available subcommands:
    add          "dict(caption='xx', ...)"
    copy         <id>
    init
-   list         [<id>]
+   list         [<id> | <caption>]
    remove       <id>
    set          <id> "dict(caption='xx', ...)"
    setpassword  <id>
@@ -121,7 +122,7 @@ def set_password(id):
             print "OK, now please input the password for that entry:"
             pwd = get_user_input_password()
             d = db[id]
-            d["password"] = base64.encodestring(encrypt_string(pwd, key))
+            d["password"] = binhex.binascii.hexlify(encrypt_string(pwd, key))
             db[id] = d
         else:
             print_error("Wrong main password!")
@@ -134,7 +135,7 @@ def copy(id):
     else:
         ret, key = check_main_password()
         if ret:
-            save_text_to_clipboard((encrypt_string(base64.decodestring(db[id]["password"]), key)))
+            save_text_to_clipboard((encrypt_string(binhex.binascii.unhexlify(db[id]["password"]), key)))
         else:
             print_error("Wrong main password!")
     db.close()
@@ -151,15 +152,29 @@ def remove(id):
             print_error("Wrong main password!")
     db.close()
 
-def list(id=None):
+def list(arg=None):
+    root = None
+
     db = db_open()
-    if id:
-        if not db.has_key(id):
-            print_error("Entry not found!")
+
+    if arg:
+        if db.has_key(arg):
+            root = db[arg]
+            print arg
         else:
-            dump_tree(db[id])
+            for i in db.keys():
+                if db[i].has_key("caption") and arg.lower() in db[i]["caption"].lower():
+                    root = db[i]
+                    print i
+                    break
     else:
-        dump_tree(db)
+        root = db
+
+    if root:
+        dump_tree(root)
+    else:
+        print_error("Entry not found!")
+
     db.close()
 
 def main():

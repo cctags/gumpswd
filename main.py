@@ -38,7 +38,7 @@ def print_error(str):
     print "[ERROR]: %s" % (str)
 
 def generate_id():
-    return str(uuid.uuid1())
+    return str(uuid.uuid4())
 
 def encrypt_string(str, key):
     return xtea.crypt(key, str)

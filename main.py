@@ -61,8 +61,12 @@ def get_user_input_password():
 
 def generate_password(range=None, size=16):
     if not range:
-        range = string.lowercase + string.uppercase + string.digits
-    return string.join(random.sample(range, size)).replace(" ", "")
+        range = string.digits + string.ascii_letters + string.digits
+    a = []
+    while len(a) < size:
+        a.append(random.choice(range))
+    random.shuffle(a)
+    return ''.join(a)
 
 def dump_tree(t, level=0, indent='    |'):
     level += 1

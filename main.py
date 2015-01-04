@@ -1,47 +1,43 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import base64
+import argparse
+import cPickle as pickle
 import datetime
-import os
-import sys
-import hashlib
-import binhex
 import getpass
+import hashlib
+import os
 import random
+import readline
 import string
-import uuid
+import sys
 
 import xtea
-import zshelve
 
 program_name    = "gumpswd"
-program_version = "v0.1"
+program_version = "v0.2"
 
-program_dbpath  = "%s.db" % (program_name.lower())
+key_info        = "setting_00_02_00_01"
+key_data        = "data_00_02_00_01"
 
-setting_key     = "setting_00_00_00_01"
-
-def print_usage():
+def print_command_usage():
     print \
-"""Usage: %s <subcommand> [option(s)] [args]
-
-Available subcommands:
-   add          "dict(caption='xx', ...)"
-   copy         <id>
-   genpassword  [<len>]
-   init
-   list         [<id> | <caption>]
-   remove       <id>
-   set          <id> "dict(caption='xx', ...)"
-   setpassword  <id>
-""" % (program_name)
-
-def print_error(str):
-    print "[ERROR]: %s" % (str)
-
-def generate_id():
-    return str(uuid.uuid4())
+"""Command action
+    d               delete the item
+    e               edit the item
+    m               print this menu
+    n               add a new item
+    p               list all items
+    p <str>         list all matching items
+    p <str> copy    copy the password of the matching item
+    p <str> show    show the password of the matching item
+    pid <id>        list the specified item
+    pid <id> copy   copy the password of the specified item
+    pid <id> show   show the password of the specified item
+    q               quit without saving changes
+    w               write data changes and exit
+    X               change the main password
+"""
 
 def encrypt_string(str, key):
     return xtea.crypt(key, str)
@@ -49,15 +45,6 @@ def encrypt_string(str, key):
 def save_text_to_clipboard(str):
     import pyperclip
     pyperclip.setcb(str)
-
-def get_user_input_password():
-    while True:
-        pwd1 = getpass.getpass("password:")
-        pwd2 = getpass.getpass("verify:")
-        if (len(pwd1) != 0) and (pwd1 == pwd2):
-            return pwd1
-        else:
-            print "Passwords don't match - try again:"
 
 def generate_password(range=None, size=16):
     if not range:
@@ -68,165 +55,310 @@ def generate_password(range=None, size=16):
     random.shuffle(a)
     return ''.join(a)
 
-def dump_tree(t, level=0, indent='    |'):
-    level += 1
-    try:
-        for i in t.items():
-            print indent * level + '-', i[0]
-            try:
-                dump_tree(i[1], level)
-            except:
-                print indent * level + '-', i[1]
-    except:
-        if hasattr(t, '__iter__'):
-            for i in t:
-                print indent * level + '-',i
-        else:
-            print indent * level + '-', t
+def dump_db(db, key):
+    print "+-- %s" % (key_info)
+    for k, v in db[key_info].items():
+        print "|   +-- %s: %s" % (k, v)
 
-def db_open():
-    try:
-        db = zshelve.btopen(program_dbpath)
-    except:
-        db = zshelve.open(program_dbpath)
+    index = 0
+    print "+-- %s" % (key_data)
+
+    for i in db[key_data]:
+        print "|   +-- %d" % (index)
+        index = index + 1
+
+        for k, v in i.items():
+            print "|   |   +-- %s: %s" % (k, encrypt_string(v, key))
+
+def print_item(db, key, index, show=False):
+    item = db[key_data][index].items()
+    print "+-- %d" % (index)
+    if show is True:
+        for k, v in item:
+            if k in ("c", "u", "p", "t"):
+                print "|   +-- %s: %s" % (k, encrypt_string(v, key))
+    else:
+        for k, v in item:
+            if k in ("c", "u", "t"):
+                print "|   +-- %s: %s" % (k, encrypt_string(v, key))
+            else:
+                print "|   +-- %s: %s" % (k, "***")
+
+def print_id_db(db, key, index, show=False, copy=False):
+    if copy is True:
+        save_text_to_clipboard(encrypt_string(db[key_data][index]["p"], key))
+    else:
+        print_item(db, key, index, show)
+
+def print_db(db, key, str=None, show=False, copy=False):
+    index = 0
+    result = []
+    for i in db[key_data]:
+        if str is None or str in encrypt_string(i["c"], key):
+            result.append(index)
+        index = index + 1
+
+    if len(result) == 0:
+        info("no match.")
+        return
+
+    if show is False and copy is False:
+        for index in result:
+            print_item(db, key, index)
+    else:
+        if len(result) > 1:
+            info("to many match.")
+            return
+
+        index = result[0]
+
+        if show is True:
+            print_item(db, key, index, True)
+        elif copy is True:
+            save_text_to_clipboard(encrypt_string(db[key_data][index]["p"], key))
+    print ""
+
+def get_pass_strip(prompt):
+    if not prompt:
+        str = getpass.getpass()
+    else:
+        str = getpass.getpass(prompt)
+    return str.strip()
+
+def get_non_empty_raw_input(prompt):
+    while True:
+        str = raw_input(prompt).strip()
+        if len(str) == 0:
+            continue
+        return str
+
+def get_non_empty_password():
+    while True:
+        pwd1 = get_pass_strip("Enter encryption key:")
+        pwd2 = get_pass_strip("Enter same key again:")
+        if (len(pwd1) != 0) and (pwd1 == pwd2):
+            return pwd1
+        else:
+            print "Passwords don't match - try again."
+
+def check_user_input_id(db, id):
+    return id in range(0, len(db[key_data]))
+
+def add_new_item(db, c, u, p, t):
+    item = {"c": c, "u": u, "p": p, "t": t}
+    db[key_data].append(item)
+
+def change_main_password(db, key, pwd):
+    if db[key_info]["sha512"] == hashlib.sha512(pwd).hexdigest():
+        return
+
+    db[key_info]["sha512"] = hashlib.sha512(pwd).hexdigest()
+
+    newkey = hashlib.md5(pwd).digest()
+
+    for i in db[key_data]:
+        for k, v in i.items():
+            a = encrypt_string(v, key)
+            i[k] = encrypt_string(encrypt_string(v, key), newkey)
+
+def load_db_from_file(file):
+    f = open(file, "rb")
+    db = pickle.load(f)
+    f.close()
     return db
 
-def check_main_password():
-    pwd = getpass.getpass("Please input the main password:")
-    db = db_open()
-    digest = db[setting_key]["sha512"]
-    db.close()
-    return (hashlib.sha512(pwd).hexdigest() == digest), hashlib.md5(pwd).digest()
+def save_db_to_file(db, file):
+    db[key_info]["update"] = str(datetime.datetime.now())
+    f = open(file, "wb")
+    pickle.dump(db, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
 
-def init():
-    db = db_open()
-    if not db.has_key(setting_key):
-        pwd = get_user_input_password()
-        db[setting_key] = { \
-                "sha512": hashlib.sha512(pwd).hexdigest(), \
-                "create": str(datetime.datetime.now()) \
-                }
-    else:
-        sys.exit(1)
-    db.close()
+def panic(str):
+    print "[ERROR]: %s\n" % (str)
+    sys.exit(1)
 
-def set_content(id, str):
-    db = db_open()
-    if id:
-        d = db[id]
-    else:
-        id = generate_id()
-        db[id] = {}
-        d = db[id]
-    t = eval(str)
-    for k, v in t.items():
-        d[k] = v
-    db[id] = d
-    db.close()
-
-def set_password(id):
-    db = db_open()
-    if not db.has_key(id):
-        print_error("Entry not found!")
-    else:
-        ret, key = check_main_password()
-        if ret:
-            print "OK, now please input the password for that entry:"
-            pwd = get_user_input_password()
-            d = db[id]
-            d["password"] = binhex.binascii.hexlify(encrypt_string(pwd, key))
-            db[id] = d
-        else:
-            print_error("Wrong main password!")
-    db.close()
-
-def copy(id):
-    db = db_open()
-    if not db.has_key(id):
-        print_error("Entry not found!")
-    else:
-        ret, key = check_main_password()
-        if ret:
-            save_text_to_clipboard((encrypt_string(binhex.binascii.unhexlify(db[id]["password"]), key)))
-        else:
-            print_error("Wrong main password!")
-    db.close()
-
-def remove(id):
-    db = db_open()
-    if not db.has_key(id):
-        print_error("Entry not found!")
-    else:
-        ret, key = check_main_password()
-        if ret:
-            del db[id]
-        else:
-            print_error("Wrong main password!")
-    db.close()
-
-def list(arg=None):
-    root = None
-
-    db = db_open()
-
-    if arg:
-        if db.has_key(arg):
-            root = db[arg]
-            print arg
-        else:
-            for i in db.keys():
-                if db[i].has_key("caption") and arg.lower() in db[i]["caption"].lower():
-                    root = db[i]
-                    print i
-                    break
-    else:
-        print program_name
-        root = db
-
-    if root:
-        dump_tree(root)
-    else:
-        print_error("Entry not found!")
-
-    db.close()
+def info(str):
+    print "[WRONG]: %s\n" % (str)
 
 def main():
-    global program_dbpath
-    print_flag = False
 
-    program_dbpath = os.path.join(os.path.expanduser("~"), program_dbpath)
+    # Parse the command line options
+    parser = argparse.ArgumentParser(description="simple password manager. %s" % (program_version))
+    parser.add_argument("-f", "--file", help="specify the db file")
+    parser.add_argument("-g", "--generate", help="generate one password in <N> characters", type=int, metavar="N")
+    version_string = program_name + " " + program_version
+    parser.add_argument("-v", "--version", action="version", version=version_string)
+    args = parser.parse_args()
 
-    if len(sys.argv) >= 2:
-        if sys.argv[1] == "init":
-            init()
-        elif sys.argv[1] == "add":
-            set_content(None, sys.argv[2])
-        elif sys.argv[1] == "set":
-            if len(sys.argv) >= 4:
-                set_content(sys.argv[2], sys.argv[3])
-            else:
-                print_flag = True
-        elif sys.argv[1] == "setpassword":
-            set_password(sys.argv[2])
-        elif sys.argv[1] == "copy":
-            copy(sys.argv[2])
-        elif sys.argv[1] == "remove":
-            remove(sys.argv[2])
-        elif sys.argv[1] == "list":
-            if len(sys.argv) > 2:
-                list(sys.argv[2])
-            else:
-                list()
-        elif sys.argv[1] == "genpassword":
-            try:
-                print generate_password(size=int(sys.argv[2]))
-            except:
-                print generate_password()
+    # generate one password
+    if args.generate is not None:
+        if args.generate in xrange(4, 128):
+            print generate_password(range=None, size=args.generate)
+            sys.exit(0)
+        else:
+            panic("invalid choice: %d (choose from 4 to 128)" % (args.generate))
+
+    # configure the db file path
+    if args.file is not None:
+        dbpath = args.file
     else:
-        print_flag = True
+        dbpath = "%s.db" % (program_name.lower())
+        dbpath = os.path.join(os.path.expanduser("~"), dbpath)
 
-    if print_flag:
-        print_usage()
+    # The db data tree
+    db = { \
+            key_info: { \
+                "sha512": "", \
+                "create": "", \
+                "update": "" \
+            }, \
+            \
+            key_data: [] \
+            }
+
+    # Check if the file exists.
+    if not os.path.exists(dbpath):
+
+        # Setup the main password.
+        pwd = get_non_empty_password()
+
+        # Init the info.
+        db[key_info]["sha512"] = hashlib.sha512(pwd).hexdigest()
+        db[key_info]["create"] = str(datetime.datetime.now())
+    else:
+
+        db = load_db_from_file(dbpath)
+
+        if not db.has_key(key_info):
+            panic("File format error!")
+
+        digest = db[key_info]["sha512"]
+
+        pwd = get_pass_strip("Enter encryption key:")
+
+        if hashlib.sha512(pwd).hexdigest() != digest:
+            panic("Permission denied!")
+
+    key = hashlib.md5(pwd).digest()
+
+    # Main loop.
+    while True:
+
+        # Get the input command.
+        cmd = raw_input("Command (m for help): ").strip()
+        if len(cmd) == 0:
+            continue
+
+        # Print
+        if cmd.startswith("p"):
+            args = cmd.split()
+
+            if args[0] == "p":
+                if len(args) == 1:
+                    print_db(db, key)
+                elif len(args) == 2:
+                    print_db(db, key, args[1])
+                elif len(args) == 3:
+                    if args[2] == "show":
+                        print_db(db, key, args[1], show=True)
+                    elif args[2] == "copy":
+                        print_db(db, key, args[1], copy=True)
+                    else:
+                        info("%s: invalid input." % (args[2]))
+
+            elif args[0] == "pid":
+                if len(args) == 1:
+                    print_db(db, key)
+                elif len(args) == 2:
+                    print_id_db(db, key, int(args[1]))
+                elif len(args) == 3:
+                    if args[2] == "show":
+                        print_id_db(db, key, int(args[1]), show=True)
+                    elif args[2] == "copy":
+                        print_id_db(db, key, int(args[1]), copy=True)
+                    else:
+                        info("%s: invalid input." % (args[2]))
+            else:
+                info("%s: unknown command." % (cmd))
+
+        # Delete.
+        elif cmd == "d":
+            id = get_non_empty_raw_input("[id]: ")
+            id = int(id)
+
+            if check_user_input_id(db, id):
+                del db[key_data][id]
+            else:
+                print "Invalid id (%d)." % (id)
+
+        # Dump.
+        elif cmd == "dump":
+            dump_db(db, key)
+
+        # Edit.
+        elif cmd == "e":
+
+            # user input id
+            id = get_non_empty_raw_input("[id]: ")
+            id = int(id)
+
+            if check_user_input_id(db, id):
+
+                op = get_non_empty_raw_input("[c/u/p/t]: ")
+                if op in ("c", "u", "p", "t"):
+                    if op == "c":
+                        value = get_non_empty_raw_input("[caption]: ")
+                    elif op == "u":
+                        value = get_non_empty_raw_input("[username]: ")
+                    elif op == "p":
+                        value = get_non_empty_password()
+                    else:
+                        value = get_non_empty_raw_input("[text]: ")
+
+                    # update the values
+                    db[key_data][id][op] = encrypt_string(value, key)
+
+                else:
+                    info("%s: invalid input." % (op))
+            else:
+                info("Invalid id (%d)." % (id))
+
+        # New.
+        elif cmd == "n":
+            c = get_non_empty_raw_input("[caption]: ")
+            u = get_non_empty_raw_input("[username]: ")
+            p = get_non_empty_password()
+            t = get_non_empty_raw_input("[text]: ")
+
+            c = encrypt_string(c, key)
+            u = encrypt_string(u, key)
+            p = encrypt_string(p, key)
+            t = encrypt_string(t, key)
+
+            add_new_item(db, c, u, p, t)
+
+        # Help.
+        elif cmd == "m":
+            print_command_usage()
+
+        # Quit.
+        elif cmd == "q":
+            sys.exit(0)
+
+        # Write.
+        elif cmd == "w":
+            save_db_to_file(db, dbpath)
+            sys.exit(0)
+
+        # Change the main password.
+        elif cmd == "X":
+            pwd = get_non_empty_password()
+            change_main_password(db, key, pwd)
+            key = hashlib.md5(pwd).digest()
+
+        # Unknown command.
+        else:
+            info("%s: unknown command." % (cmd))
 
 if __name__ == "__main__":
     main()

@@ -250,6 +250,9 @@ def main():
         print "Updated: %s" % (db[key_info]["update"])
     print ""
 
+    # Tune the C-u
+    readline.parse_and_bind(r"\C-u: kill-whole-line")
+
     # Main loop.
     while True:
 

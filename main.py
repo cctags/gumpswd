@@ -50,8 +50,10 @@ def generate_password(range=None, size=16):
     if not range:
         range = string.digits + string.ascii_letters + string.digits
     a = []
-    while len(a) < size:
+    while len(a) < size - 2:
         a.append(random.choice(range))
+    while len(a) < size:
+        a.append(random.choice(string.punctuation))
     random.shuffle(a)
     return ''.join(a)
 

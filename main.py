@@ -243,6 +243,13 @@ def main():
 
     key = hashlib.md5(pwd).digest()
 
+    # Print the db info.
+    print ">> file: %s" % (dbpath)
+    print "Created: %s" % (db[key_info]["create"])
+    if db[key_info].has_key("update"):
+        print "Updated: %s" % (db[key_info]["update"])
+    print ""
+
     # Main loop.
     while True:
 

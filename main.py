@@ -39,6 +39,13 @@ def print_command_usage():
     X               change the main password
 """
 
+def panic(str):
+    print "[ERROR]: %s\n" % (str)
+    sys.exit(1)
+
+def info(str):
+    print "[WRONG]: %s\n" % (str)
+
 def encrypt_string(str, key):
     return xtea.crypt(key, str)
 
@@ -121,18 +128,31 @@ def print_db(db, key, str=None, show=False, copy=False):
     print ""
 
 def get_pass_strip(prompt):
-    if not prompt:
-        str = getpass.getpass()
-    else:
-        str = getpass.getpass(prompt)
-    return str.strip()
+    try:
+        if not prompt:
+            str = getpass.getpass()
+        else:
+            str = getpass.getpass(prompt)
+        return str.strip()
+    except KeyboardInterrupt:
+        print ""
+        panic("interrupted!")
+
+def get_non_empty_raw_input_unsafe(prompt):
+    while True:
+        str = raw_input(prompt).strip()
+        if len(str) != 0:
+            return str
 
 def get_non_empty_raw_input(prompt):
     while True:
-        str = raw_input(prompt).strip()
-        if len(str) == 0:
-            continue
-        return str
+        try:
+            return get_non_empty_raw_input_unsafe(prompt)
+        except KeyboardInterrupt:
+            print ""
+            panic("interrupted!")
+        except EOFError:
+            print ""
 
 def get_non_empty_password():
     while True:
@@ -174,13 +194,6 @@ def save_db_to_file(db, file):
     f = open(file, "wb")
     pickle.dump(db, f, pickle.HIGHEST_PROTOCOL)
     f.close()
-
-def panic(str):
-    print "[ERROR]: %s\n" % (str)
-    sys.exit(1)
-
-def info(str):
-    print "[WRONG]: %s\n" % (str)
 
 def main():
 
@@ -257,9 +270,10 @@ def main():
     while True:
 
         # Get the input command.
-        cmd = raw_input("Command (m for help): ").strip()
-        if len(cmd) == 0:
-            continue
+        try:
+            cmd = get_non_empty_raw_input_unsafe("Command (m for help): ")
+        except:
+            sys.exit(0)
 
         # Print
         if cmd.startswith("p"):

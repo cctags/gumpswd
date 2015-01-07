@@ -5,14 +5,14 @@ import argparse
 import cPickle as pickle
 import datetime
 import getpass
-import hashlib
 import os
 import random
 import readline
 import string
 import sys
 
-import xtea
+from Crypto.Cipher import Blowfish
+from Crypto.Hash import SHA512
 
 program_name    = "gumpswd"
 program_version = "v0.2"
@@ -39,6 +39,10 @@ def print_command_usage():
     X               change the main password
 """
 
+BS = Blowfish.block_size
+pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
+unpad = lambda s : s[:-ord(s[len(s)-1:])]
+
 def panic(str):
     print "[ERROR]: %s\n" % (str)
     sys.exit(1)
@@ -46,18 +50,27 @@ def panic(str):
 def info(str):
     print "[WRONG]: %s\n" % (str)
 
-def encrypt_string(str, key):
-    return xtea.crypt(key, str)
-
-def decrypt_string(str, key):
-    return xtea.crypt(key, str)
-
 def save_text_to_clipboard(str):
     import pyperclip
     pyperclip.setcb(str)
 
-def generate_key(str):
-    return hashlib.md5(str).digest()
+def generate_key_and_iv(pwd):
+    hash = SHA512.new()
+    hash.update(pwd)
+    a = hash.digest()
+    return a[BS:], a[:BS]
+
+def encrypt_data(data, pwd):
+    key, iv = generate_key_and_iv(pwd)
+    cipher = Blowfish.new(key, Blowfish.MODE_CBC, iv)
+    data = pad(data)
+    return cipher.encrypt(data)
+
+def decrypt_data(data, pwd):
+    key, iv = generate_key_and_iv(pwd)
+    cipher = Blowfish.new(key, Blowfish.MODE_CBC, iv)
+    data = cipher.decrypt(data)
+    return unpad(data)
 
 def generate_password(range=None, size=16):
     if not range:
@@ -179,23 +192,23 @@ def add_new_item(db, c, u, p, t):
     item = {"c": c, "u": u, "p": p, "t": t}
     db[key_data].append(item)
 
-def load_db_from_file(file, key):
+def load_db_from_file(file, pwd):
     # Read the file.
     f = open(file, "rb")
     data = f.read()
     f.close()
 
     # decrypt the data
-    data = decrypt_string(data, key)
+    data = decrypt_data(data, pwd)
 
     # Read the object from data
     try:
         db = pickle.loads(data)
         return db
-    except pickle.UnpicklingError:
+    except:
         panic("Wrong encryption key?")
 
-def save_db_to_file(db, file, key):
+def save_db_to_file(db, file, pwd):
     # Update the modification time
     db[key_info]["update"] = str(datetime.datetime.now())
 
@@ -203,7 +216,7 @@ def save_db_to_file(db, file, key):
     data = pickle.dumps(db, pickle.HIGHEST_PROTOCOL)
 
     # encrypt the data
-    data = encrypt_string(data, key)
+    data = encrypt_data(data, pwd)
 
     # Write the string to the file
     f = open(file, "wb")
@@ -250,16 +263,14 @@ def main():
 
         # Setup the main password.
         pwd = get_non_empty_password()
-        key = generate_key(pwd)
 
         # Init the info.
         db[key_info]["create"] = str(datetime.datetime.now())
     else:
 
         pwd = get_pass_strip("Enter encryption key:")
-        key = generate_key(pwd)
 
-        db = load_db_from_file(dbpath, key)
+        db = load_db_from_file(dbpath, pwd)
 
         if not db.has_key(key_info):
             panic("File format error!")
@@ -376,13 +387,12 @@ def main():
 
         # Write.
         elif cmd == "w":
-            save_db_to_file(db, dbpath, key)
+            save_db_to_file(db, dbpath, pwd)
             sys.exit(0)
 
         # Change the main password.
         elif cmd == "X":
             pwd = get_non_empty_password()
-            key = generate_key(pwd)
 
         # Unknown command.
         else:

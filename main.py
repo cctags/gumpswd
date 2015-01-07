@@ -119,8 +119,7 @@ def print_id_db(db, index, show=False, copy=False):
     if check_user_input_id(db, index):
         if copy is True:
             save_text_to_clipboard(db[key_data][index]["p"])
-        else:
-            print_item(db, index, show)
+        print_item(db, index, show)
     else:
         print "Invalid id (%d)." % (index)
 
@@ -141,15 +140,14 @@ def print_db(db, str=None, show=False, copy=False):
             print_item(db, index)
     else:
         if len(result) > 1:
-            info("to many match.")
+            info("too many match.")
             return
 
         index = result[0]
 
-        if show is True:
-            print_item(db, index, True)
-        elif copy is True:
+        if copy is True:
             save_text_to_clipboard(db[key_data][index]["p"])
+        print_item(db, index, show)
     print ""
 
 def get_pass_strip(prompt):

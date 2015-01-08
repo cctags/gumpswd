@@ -25,6 +25,8 @@ def print_command_usage():
 """Command action
     d               delete the item
     e               edit the item
+    export <file>   export the items to the <file>
+    import <file>   import the items from the <file>
     m               print this menu
     n               add a new item
     p               list all items
@@ -189,6 +191,41 @@ def get_non_empty_password():
 def add_new_item(db, c, u, p, t):
     item = {"c": c, "u": u, "p": p, "t": t}
     db[key_data].append(item)
+
+def export_to_file(db, filename):
+    try:
+        f = open(filename, "wb")
+    except:
+        info("%s: open file error." % (filename))
+        return
+
+    for i in db[key_data]:
+        f.write("{{{" + os.linesep)
+        f.write(i["c"] + os.linesep)
+        f.write(i["u"] + os.linesep)
+        f.write(i["p"] + os.linesep)
+        f.write(i["t"] + os.linesep)
+        f.write("}}}" + os.linesep * 2)
+    f.close()
+
+def import_from_file(db, filename):
+    try:
+        f = open(filename, "r")
+    except:
+        info("%s: file not found." % (filename))
+        return
+
+    a = list()
+    for line in f:
+        str = line.strip()
+        if len(str) != 0:
+            a.append(str)
+    f.close()
+
+    i = 0
+    while i < len(a) / 4:
+        add_new_item(db, a[4 * i], a[4 * i + 1], a[4 * i + 2], a[4 * i + 3])
+        i += 1
 
 def load_db_from_file(file, pwd):
     # Read the file.
@@ -365,6 +402,22 @@ def main():
                     info("%s: invalid input." % (op))
             else:
                 info("Invalid id (%d)." % (id))
+
+        # Export.
+        elif cmd.startswith("export"):
+            args = cmd.split()
+            if args[0] == "export" and len(args) == 2:
+                export_to_file(db, args[1])
+            else:
+                info("%s: unknown command." % (cmd))
+
+        # Import.
+        elif cmd.startswith("import"):
+            args = cmd.split()
+            if args[0] == "import" and len(args) == 2:
+                import_from_file(db, args[1])
+            else:
+                info("%s: unknown command." % (cmd))
 
         # New.
         elif cmd == "n":

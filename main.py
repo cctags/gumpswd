@@ -88,21 +88,6 @@ def generate_password(range=None, size=16):
 def check_user_input_id(db, id):
     return id in xrange(0, len(db[key_data]))
 
-def dump_db(db):
-    print "+-- %s" % (key_info)
-    for k, v in db[key_info].items():
-        print "|   +-- %s: %s" % (k, v)
-
-    index = 0
-    print "+-- %s" % (key_data)
-
-    for i in db[key_data]:
-        print "|   +-- %d" % (index)
-        index = index + 1
-
-        for k, v in i.items():
-            print "|   |   +-- %s: %s" % (k, v)
-
 def print_item(db, index, show=False):
     item = db[key_data][index].items()
     print "+-- %d" % (index)
@@ -123,7 +108,7 @@ def print_id_db(db, index, show=False, copy=False):
             save_text_to_clipboard(db[key_data][index]["p"])
         print_item(db, index, show)
     else:
-        print "Invalid id (%d)." % (index)
+        print "invalid id (%d)." % (index)
 
 def print_db(db, str=None, show=False, copy=False):
     index = 0
@@ -369,11 +354,21 @@ def main():
             if check_user_input_id(db, id):
                 del db[key_data][id]
             else:
-                print "Invalid id (%d)." % (id)
+                print "invalid id (%d)." % (id)
 
-        # Dump.
-        elif cmd == "dump":
-            dump_db(db)
+        # Debug.
+        elif cmd == "debug":
+            while True:
+                try:
+                    # Get the input command.
+                    debugcmd = get_non_empty_raw_input_unsafe("Command (#): ")
+                    try:
+                        exec(debugcmd)
+                    except:
+                        info("%s: invalid input." % (debugcmd))
+                except:
+                    print ""
+                    break
 
         # Edit.
         elif cmd == "e":
@@ -401,7 +396,7 @@ def main():
                 else:
                     info("%s: invalid input." % (op))
             else:
-                info("Invalid id (%d)." % (id))
+                info("invalid id (%d)." % (id))
 
         # Export.
         elif cmd.startswith("export"):

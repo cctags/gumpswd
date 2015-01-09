@@ -3,12 +3,14 @@
 
 import argparse
 import cPickle as pickle
+import cStringIO as StringIO
 import datetime
 import getpass
 import os
 import random
 import readline
 import string
+import subprocess
 import sys
 
 from Crypto.Cipher import Blowfish
@@ -85,28 +87,38 @@ def generate_password(range=None, size=16):
     random.shuffle(a)
     return ''.join(a)
 
+def less(filename=None, data=None):
+    if filename:
+        expression = r"less %s" % (filename)
+        p = subprocess.Popen(expression)
+    elif data:
+        expression = r"less"
+        p = subprocess.Popen(expression, stdin=subprocess.PIPE)
+        p.communicate(data)
+    p.wait()
+
 def check_user_input_id(db, id):
     return id in xrange(0, len(db[key_data]))
 
-def print_item(db, index, show=False):
+def print_item(db, index, file, show=False):
     item = db[key_data][index].items()
-    print "+-- %d" % (index)
+    file.write("+-- %d%s" % (index, os.linesep))
     if show is True:
         for k, v in item:
             if k in ("c", "u", "p", "t"):
-                print "|   +-- %s: %s" % (k, v)
+                file.write("|   +-- %s: %s%s" % (k, v, os.linesep))
     else:
         for k, v in item:
             if k in ("c", "u", "t"):
-                print "|   +-- %s: %s" % (k, v)
+                file.write("|   +-- %s: %s%s" % (k, v, os.linesep))
             else:
-                print "|   +-- %s: %s" % (k, "***")
+                file.write("|   +-- %s: %s%s" % (k, "***", os.linesep))
 
 def print_id_db(db, index, show=False, copy=False):
     if check_user_input_id(db, index):
         if copy is True:
             save_text_to_clipboard(db[key_data][index]["p"])
-        print_item(db, index, show)
+        print_item(db, index, sys.stdout, show)
     else:
         print "invalid id (%d)." % (index)
 
@@ -123,8 +135,11 @@ def print_db(db, str=None, show=False, copy=False):
         return
 
     if show is False and copy is False:
+        s = StringIO.StringIO()
         for index in result:
-            print_item(db, index)
+            print_item(db, index, s)
+        less(data=s.getvalue())
+        s.close()
     else:
         if len(result) > 1:
             info("too many match.")
@@ -134,7 +149,7 @@ def print_db(db, str=None, show=False, copy=False):
 
         if copy is True:
             save_text_to_clipboard(db[key_data][index]["p"])
-        print_item(db, index, show)
+        print_item(db, index, sys.stdout, show)
     print ""
 
 def get_pass_strip(prompt):

@@ -7,14 +7,14 @@ import cStringIO as StringIO
 import datetime
 import getpass
 import os
-import random
 import readline
 import string
 import subprocess
 import sys
 
 from Crypto.Cipher import Blowfish
-from Crypto.Hash import SHA512
+from Crypto.Hash   import SHA512
+from Crypto.Random import random
 
 program_name    = "gumpswd"
 program_version = "v0.2"
@@ -80,12 +80,14 @@ def generate_password(range=None, size=16):
     if not range:
         range = string.digits + string.ascii_letters + string.digits
     a = []
-    while len(a) < size - 2:
+    while len(a) < size - 4:
         a.append(random.choice(range))
-    while len(a) < size:
-        a.append(random.choice(string.punctuation))
+    while len(a) < size - 2:
+        a.append(random.choice(r"+=-@#~,.[]()!%^*$"))
     random.shuffle(a)
-    return ''.join(a)
+    return random.choice(string.ascii_letters) + \
+           ''.join(a) + \
+           random.choice(string.ascii_letters)
 
 def less(filename=None, data=None):
     if filename:

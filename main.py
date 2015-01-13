@@ -29,6 +29,7 @@ def print_command_usage():
     e               edit the item
     export <file>   export the items to the <file>
     import <file>   import the items from the <file>
+    info            show the meta info
     m               print this menu
     n               add a new item
     p               list all items
@@ -154,6 +155,13 @@ def print_db(db, str=None, show=False, copy=False):
         print_item(db, index, sys.stdout, show)
     print ""
 
+def print_info(db, dbpath):
+    print "  File: %s" % (dbpath)
+    print "  Size: {:,}".format(len(db[key_data]))
+    print "Create: {:%Y-%m-%d %H:%M:%S}".format(db[key_info]["create"])
+    print "Update: {:%Y-%m-%d %H:%M:%S}".format(db[key_info]["update"])
+    print ""
+
 def get_pass_strip(prompt):
     try:
         if not prompt:
@@ -248,7 +256,7 @@ def load_db_from_file(file, pwd):
 
 def save_db_to_file(db, file, pwd):
     # Update the modification time
-    db[key_info]["update"] = str(datetime.datetime.now())
+    db[key_info]["update"] = datetime.datetime.now()
 
     # Dump the object to data
     data = pickle.dumps(db, pickle.HIGHEST_PROTOCOL)
@@ -303,7 +311,8 @@ def main():
         pwd = get_non_empty_password()
 
         # Init the info.
-        db[key_info]["create"] = str(datetime.datetime.now())
+        db[key_info]["create"] = datetime.datetime.now()
+        db[key_info]["update"] = datetime.datetime.now()
     else:
 
         pwd = get_pass_strip("Enter encryption key:")
@@ -314,11 +323,7 @@ def main():
             panic("File format error!")
 
     # Print the db info.
-    print ">> file: %s" % (dbpath)
-    print "Created: %s" % (db[key_info]["create"])
-    if db[key_info].has_key("update"):
-        print "Updated: %s" % (db[key_info]["update"])
-    print ""
+    print_info(db, dbpath)
 
     # Tune the C-u
     readline.parse_and_bind(r"\C-u: kill-whole-line")
@@ -440,6 +445,10 @@ def main():
                     modified_flag = True
             else:
                 info("%s: unknown command." % (cmd))
+
+        # Info.
+        elif cmd == "info":
+            print_info(db, dbpath)
 
         # New.
         elif cmd == "n":

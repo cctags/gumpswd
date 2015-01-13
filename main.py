@@ -191,8 +191,8 @@ def get_non_empty_raw_input(prompt):
 
 def get_non_empty_password():
     while True:
-        pwd1 = get_pass_strip("Enter encryption key:")
-        pwd2 = get_pass_strip("Enter same key again:")
+        pwd1 = get_pass_strip("Create encryption key:")
+        pwd2 = get_pass_strip("Verify encryption key:")
         if (len(pwd1) != 0) and (pwd1 == pwd2):
             return pwd1
         else:

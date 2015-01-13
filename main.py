@@ -228,6 +228,7 @@ def import_from_file(db, filename):
     while i < len(a) / 4:
         add_new_item(db, a[4 * i], a[4 * i + 1], a[4 * i + 2], a[4 * i + 3])
         i += 1
+    return i
 
 def load_db_from_file(file, pwd):
     # Read the file.
@@ -322,12 +323,18 @@ def main():
     # Tune the C-u
     readline.parse_and_bind(r"\C-u: kill-whole-line")
 
+    # Init the modified flag
+    modified_flag = False
+
     # Main loop.
     while True:
 
         # Get the input command.
         try:
-            cmd = get_non_empty_raw_input_unsafe("Command (m for help): ")
+            prompt = "Command (m for help): "
+            if modified_flag:
+                prompt = r"[+] " + prompt
+            cmd = get_non_empty_raw_input_unsafe(prompt)
         except:
             sys.exit(0)
 
@@ -370,6 +377,7 @@ def main():
 
             if check_user_input_id(db, id):
                 del db[key_data][id]
+                modified_flag = True
             else:
                 print "invalid id (%d)." % (id)
 
@@ -410,6 +418,7 @@ def main():
                     # update the values
                     db[key_data][id][op] = value
 
+                    modified_flag = True
                 else:
                     info("%s: invalid input." % (op))
             else:
@@ -427,7 +436,8 @@ def main():
         elif cmd.startswith("import"):
             args = cmd.split()
             if args[0] == "import" and len(args) == 2:
-                import_from_file(db, args[1])
+                if import_from_file(db, args[1]) > 0:
+                    modified_flag = True
             else:
                 info("%s: unknown command." % (cmd))
 
@@ -440,6 +450,8 @@ def main():
 
             add_new_item(db, c, u, p, t)
 
+            modified_flag = True
+
         # Help.
         elif cmd == "m":
             print_command_usage()
@@ -450,12 +462,14 @@ def main():
 
         # Write.
         elif cmd == "w":
-            save_db_to_file(db, dbpath, pwd)
-            sys.exit(0)
+            if modified_flag:
+                save_db_to_file(db, dbpath, pwd)
+                sys.exit(0)
 
         # Change the main password.
         elif cmd == "X":
             pwd = get_non_empty_password()
+            modified_flag = True
 
         # Unknown command.
         else:

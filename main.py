@@ -162,10 +162,10 @@ def print_info(db, dbpath):
     print "Update: {:%Y-%m-%d %H:%M:%S}".format(db[key_info]["update"])
     print ""
 
-def get_pass_strip(prompt):
+def get_pass_strip(prompt=None):
     try:
         if not prompt:
-            str = getpass.getpass()
+            str = getpass.getpass("Enter encryption key: ")
         else:
             str = getpass.getpass(prompt)
         return str.strip()
@@ -191,8 +191,8 @@ def get_non_empty_raw_input(prompt):
 
 def get_non_empty_password():
     while True:
-        pwd1 = get_pass_strip("Create encryption key:")
-        pwd2 = get_pass_strip("Verify encryption key:")
+        pwd1 = get_pass_strip("Create the new encryption key: ")
+        pwd2 = get_pass_strip("Verify the new encryption key: ")
         if (len(pwd1) != 0) and (pwd1 == pwd2):
             return pwd1
         else:
@@ -315,7 +315,7 @@ def main():
         db[key_info]["update"] = datetime.datetime.now()
     else:
 
-        pwd = get_pass_strip("Enter encryption key:")
+        pwd = get_pass_strip()
 
         db = load_db_from_file(dbpath, pwd)
 
@@ -433,7 +433,10 @@ def main():
         elif cmd.startswith("export"):
             args = cmd.split()
             if args[0] == "export" and len(args) == 2:
-                export_to_file(db, args[1])
+                if pwd == get_pass_strip():
+                    export_to_file(db, args[1])
+                else:
+                    info("Wrong encryption key.")
             else:
                 info("%s: unknown command." % (cmd))
 
@@ -477,8 +480,11 @@ def main():
 
         # Change the main password.
         elif cmd == "X":
-            pwd = get_non_empty_password()
-            modified_flag = True
+            if pwd == get_pass_strip():
+                pwd = get_non_empty_password()
+                modified_flag = True
+            else:
+                info("Wrong encryption key.")
 
         # Unknown command.
         else:

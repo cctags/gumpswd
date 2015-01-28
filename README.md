@@ -21,24 +21,24 @@ simple password manager. v0.2
 optional arguments:
   -h, --help            show this help message and exit
   -f FILE, --file FILE  specify the db file
-  -g N, --generate N    generate one password in <N> characters
+  -g N, --generate N    generate one password in &ltN> characters
   -v, --version         show program's version number and exit
 
 Command action
     d               delete the item
     e               edit the item
-    export <file>   export the items to the <file>
-    import <file>   import the items from the <file>
+    export &ltfile>   export the items to the &ltfile>
+    import &ltfile>   import the items from the &ltfile>
     info            show the meta info
     m               print this menu
     n               add a new item
     p               list all items
-    p <str>         list all matching items
-    p <str> copy    copy the password of the matching item
-    p <str> show    show the password of the matching item
-    pid <id>        list the specified item
-    pid <id> copy   copy the password of the specified item
-    pid <id> show   show the password of the specified item
+    p &ltstr>         list all matching items
+    p &ltstr> copy    copy the password of the matching item
+    p &ltstr> show    show the password of the matching item
+    pid &ltid>        list the specified item
+    pid &ltid> copy   copy the password of the specified item
+    pid &ltid> show   show the password of the specified item
     q               quit without saving changes
     w               write data changes and exit
     X               change the main password

@@ -11,6 +11,7 @@ import readline
 import string
 import subprocess
 import sys
+import textwrap
 
 from Crypto.Cipher import Blowfish
 from Crypto.Hash   import SHA512
@@ -104,18 +105,36 @@ def check_user_input_id(db, id):
     return id in xrange(0, len(db[key_data]))
 
 def print_item(db, index, file, show=False):
-    item = db[key_data][index].items()
-    file.write("+-- %d%s" % (index, os.linesep))
-    if show is True:
-        for k, v in item:
-            if k in ("c", "u", "p", "t"):
-                file.write("|   +-- %s: %s%s" % (k, v, os.linesep))
-    else:
-        for k, v in item:
-            if k in ("c", "u", "t"):
-                file.write("|   +-- %s: %s%s" % (k, v, os.linesep))
-            else:
-                file.write("|   +-- %s: %s%s" % (k, "***", os.linesep))
+    lines = []
+    item = db[key_data][index]
+
+    # header
+    lines.append("+---+--------------------------------------------------------------+")
+
+    # id
+    lines.append("| - | %d" % (index))
+
+    for k in ("c", "u", "p", "t"):
+        if k == "p" and show is False:
+            lines.append("| %s | ***" % (k))
+        else:
+            t = textwrap.fill(item[k], width=60).splitlines()
+
+            lines.append("| %s | %s" % (k, t[0]))
+
+            for i in t[1:]:
+                lines.append("|   | %s" % (i))
+
+    # footer
+    lines.append("+---+--------------------------------------------------------------+")
+
+    # write to the file
+    for i in lines:
+        if len(i) == 68:
+            file.write(i + os.linesep)
+        else:
+            file.write("%s%s|%s" % (i, " " * (67 - len(i)), os.linesep))
+    file.write(os.linesep)
 
 def print_id_db(db, index, show=False, copy=False):
     if check_user_input_id(db, index):

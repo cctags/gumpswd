@@ -58,7 +58,7 @@ def info(str):
 
 def save_text_to_clipboard(str):
     import pyperclip
-    pyperclip.setcb(str)
+    pyperclip.copy(str)
 
 def generate_key_and_iv(pwd):
     hash = SHA512.new()

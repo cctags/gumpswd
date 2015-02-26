@@ -17,6 +17,8 @@ from Crypto.Cipher import Blowfish
 from Crypto.Hash   import SHA512
 from Crypto.Random import random
 
+import filelock
+
 program_name    = "gumpswd"
 program_version = "v0.2"
 
@@ -312,6 +314,13 @@ def main():
     else:
         dbpath = "%s.db" % (program_name.lower())
         dbpath = os.path.join(os.path.expanduser("~"), dbpath)
+
+    # Acquire the file lock, which will be automatically released
+    try:
+        flock = filelock.FileLock(dbpath, timeout=1)
+        flock.acquire()
+    except:
+        panic("%s: file is locked!" % dbpath)
 
     # The db data tree
     db = { \
